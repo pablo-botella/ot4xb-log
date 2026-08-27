@@ -1,3 +1,8 @@
+---
+name: ot4xb-log
+description: "The application that shows and logs the lines an Xbase++ program sends with the ot4xb.dll logging functions (ot4xb_lSendLogStrFL, ot4xb_lSendLogStr): a tiny Win32 tray exe that receives them via WM_COPYDATA, appends them to a .log file and displays them in a RichEdit window. Use when working with ot4xb-log or ot4xb_log.exe."
+---
+
 # ot4xb-log
 
 **ot4xb-log** is the application that shows the log lines an Xbase++ program
@@ -217,54 +222,24 @@ inside the text area - opens the menu:
 | `WM_APP + 2` | Internal: tray icon callback. |
 | `WM_APP + 3` | Internal: exit request; guarded by `wp == lp == this`, so it cannot be triggered from outside. |
 
-## Building
+## Rules for agents working on this repo
 
-- Open `ot4xb_log.sln` with Visual Studio 2022 (platform toolset **v143**,
-  character set MultiByte). Configurations: `Debug|Win32` and `Release|Win32`.
-- Output: `Release\ot4xb_log.exe` (and `Debug\ot4xb_log.exe` + `.pdb`).
-- Links against `shlwapi.lib`; loads `Riched20.dll` at runtime.
-- Version numbers come from two generated files, `source/ot4xb_log_version.h`
-  (used by the `.rc`) and `source/ot4xb_log_version.props` (an MSBuild property
-  sheet the project imports, which sets the linker's `/VERSION`). Both are
-  written by mkskill from `_mkskill/mkskill.config.xml` - never edit them, and
-  never hand-edit a version in the `.rc` or the `.vcxproj`.
-- The code is **x86 only**: pointer arithmetic is done through `DWORD` casts
-  (`_mk_ptr_`, the command-line parser), so an x64 configuration would need
-  those rewritten to `UINT_PTR` first.
-
-The build directories (`Debug/`, `Release/`, `.vs/`) are ignored by git; the
-executable is distributed as a GitHub release asset, not committed.
-
-## Releasing
-
-The release number lives in `_mkskill/mkskill.config.xml` (`<version-spec>`)
-and is the only place it is declared. From it mkskill generates two files that
-the build consumes through standard mechanisms, so the number is never typed by
-hand anywhere:
-
-- `source/ot4xb_log_version.h` - included by `ot4xb_log.rc` for its
-  `VS_VERSION_INFO` block (what Explorer shows: file and product version).
-- `source/ot4xb_log_version.props` - an MSBuild property sheet imported by
-  `ot4xb_log.vcxproj` (both configurations, through the standard
-  `PropertySheets` import group). It sets `Link/Version`, i.e. the linker's
-  `/VERSION:major.minor`, which stamps the PE header's image version. The
-  linker only takes major and minor; the build component lives in the
-  resource.
-
-Both generated files are committed, so the project builds without mkskill
-installed. Docs (this README, `AGENTS.md`, the Claude
-skill) are composed from `_mkskill/src/*.md` by
-[mkskill](https://github.com/pablo-botella/mkskill); never edit the generated
-files directly.
-
-```sh
-# 1. bump the number, stamp the title: regenerates ot4xb_log_version.h and __publish.bat
-mkskill -vinc-build -label:title "what shipped"
-mkskill build            # the docs
-# 2. build Release|Win32 in Visual Studio (picks up the new version header)
-# 3. commit, then tag + push + GitHub release with the exe attached
-__publish.bat
-```
-
-`__publish.bat` is generated from the config, git-ignored, and runs
-`git tag`, `git push --tags` and `gh release create <tag> Release\ot4xb_log.exe`.
+- **Single source file.** All behaviour is in `source/ot4xb_log.cpp`; describe
+  and change it from what the code does, not from assumptions about the ot4xb
+  sender, whose source is not in this repository.
+- **Wire protocol is frozen.** The `WM_APP+1` activate message, the
+  `WM_COPYDATA` payload and the NUL-separated `.log` format are consumed by
+  the ot4xb logging functions in deployed builds. Do not change them without
+  an explicit request. The command line is not part of that contract - nothing
+  launches the viewer automatically - but keep its options as documented.
+- **x86 only.** Do not add an x64 configuration or "fix" the `DWORD` pointer
+  casts unless asked; the tool is shipped as a 32-bit exe on purpose.
+- **Docs are generated.** Edit `_mkskill/src/*.md`, then run `mkskill build`.
+  `README.md`, `AGENTS.md` and `.claude/skills/ot4xb-log/SKILL.md` are outputs.
+- **The version has one source.** `_mkskill/mkskill.config.xml` generates
+  `source/ot4xb_log_version.h` and `source/ot4xb_log_version.props`; the `.rc`
+  and the `.vcxproj` only consume them. Bump with `mkskill -vinc-*`, never by
+  editing a number in the resource, the project file or the generated files.
+- **Repository language is English.**
+- **Git is the owner's job**: never commit, tag or push; leave the working tree
+  ready and report.
